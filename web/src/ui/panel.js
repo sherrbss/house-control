@@ -33,9 +33,11 @@ function acTemperatureColor(target, cfg) {
 
 export function createPanel(root, config, store, { onFocus, onMenu }) {
   const { state } = store;
-  const ui = { room: 'all', sheet: null };
+  const ui = { room: 'all', sheet: null, level: config.levels[0].id };
   let world = null;
   const roomName = new Map(config.rooms.map((r) => [r.id, r.name]));
+  const roomLevel = new Map(config.rooms.map((r) => [r.id, r.level]));
+  const multiLevel = config.levels.length > 1;
 
   /* ---------- skeleton ---------- */
 
@@ -43,7 +45,7 @@ export function createPanel(root, config, store, { onFocus, onMenu }) {
   const tooltip = h('div.tooltip');
   const homeSub = h('div.home-sub');
   const power = h('button.round.power', { title: 'Everything on / off', 'aria-label': 'Toggle everything', onclick: toggleEverything }, icon('power', 21, 2.2));
-  const gear = h('button.round', { title: 'Floor plan', 'aria-label': 'Floor plan menu', onclick: () => onMenu(gear) }, icon('settings', 17));
+  const gear = h('button.round', { title: 'Settings and floor plans', 'aria-label': 'Settings and floor plans', onclick: () => onMenu(gear) }, icon('settings', 17));
   // Shown while an AI assistant has a link to this home (AI Access on the Mac).
   const aiBadge = h('button.ai-badge', { hidden: true, title: 'An AI assistant has access — click to manage', 'aria-label': 'AI access',
     onclick: () => onMenu(aiBadge, 'agent') }, icon('sparkles', 13, 2.2), h('span', 'AI'));
@@ -62,8 +64,25 @@ export function createPanel(root, config, store, { onFocus, onMenu }) {
   sheet.inert = true;
   const toastEl = h('div.panel-toast');
 
+  // A home on several floors: one button per floor under the 3D model, lowest first.
+  const floorButtons = new Map();
+  const floors = h('div.floors', { role: 'group', 'aria-label': 'Floors', hidden: !multiLevel },
+    config.levels.map((l) => {
+      const count = h('span.count.zero', '0');
+      const b = h('button.floor', { 'aria-label': l.name, onclick: () => { haptic('tick'); showLevel(l.id); } }, h('span', l.name), count);
+      floorButtons.set(l.id, { b, count });
+      return b;
+    }));
+
+  // Back from wherever the camera was moved to; only there while it is somewhere else.
+  const viewReset = h('button.view-reset', {
+    title: 'Reset view',
+    'aria-label': 'Reset view',
+    onclick: () => { haptic('tick'); world?.resetView(); },
+  }, icon('fit', 15, 2));
+
   const clip = h('div.card-clip',
-    h('div.stage', canvas),
+    h('div.stage', canvas, floors, viewReset),
     h('div.tint'),
     h('header.top',
       h('div.home', h('div.home-badge', icon('home', 17)),
@@ -100,6 +119,20 @@ export function createPanel(root, config, store, { onFocus, onMenu }) {
     update();
     roomButtons.get(id).b.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
     onFocus(id === 'all' ? null : { kind: 'room', id });
+  }
+
+  // The model shows another floor; a room on a different one is let go.
+  function showLevel(id) {
+    if (ui.room !== 'all' && roomLevel.get(ui.room) !== id) { ui.room = 'all'; layoutTiles(); }
+    world?.setLevel(id);
+    levelShown(id);
+  }
+
+  function levelShown(id) {
+    if (ui.level === id) return;
+    ui.level = id;
+    if (multiLevel && ui.room === 'all') layoutTiles();
+    update();
   }
 
   function inScope(cfg) {
@@ -227,10 +260,11 @@ export function createPanel(root, config, store, { onFocus, onMenu }) {
       update() {
         const s = state.acs[cfg.id];
         el.classList.toggle('on', s.on);
+        el.classList.toggle('idle', s.on && s.idle);
         el.style.setProperty('--c', MODE_COLORS[s.mode]);
         if (shownMode !== s.mode) { bubble.replaceChildren(icon(s.mode, 19)); shownMode = s.mode; }
         value.textContent = `${s.target}°`;
-        sub.textContent = `${s.on ? MODE_LABEL[s.mode] : 'Off'} · Room ${s.roomTemp.toFixed(isPhone ? 0 : 1)}°`;
+        sub.textContent = `${!s.on ? 'Off' : s.idle ? 'Idle' : MODE_LABEL[s.mode]} · Room ${s.roomTemp.toFixed(isPhone ? 0 : 1)}°`;
       },
     };
   }
@@ -248,13 +282,19 @@ export function createPanel(root, config, store, { onFocus, onMenu }) {
     const nodes = [];
     let i = 0;
     const add = (t) => { t.el.style.setProperty('--i', i++); nodes.push(t.el); };
-    for (const room of config.rooms) {
-      if (ui.room !== 'all' && room.id !== ui.room) continue;
-      const devices = [...tiles.values()].filter((t) => t.cfg.room === room.id);
-      if (!devices.length) continue;
-      if (ui.room === 'all') nodes.push(h('div.group-label', room.name));
-      devices.filter((t) => t.kind === 'ac').forEach(add);
-      devices.filter((t) => t.kind === 'light').forEach(add);
+    // On several floors the one on show comes first, each under its own heading.
+    const levels = [...config.levels].sort((a, b) => (b.id === ui.level) - (a.id === ui.level));
+    for (const level of levels) {
+      const before = nodes.length;
+      for (const room of config.rooms) {
+        if (room.level !== level.id || (ui.room !== 'all' && room.id !== ui.room)) continue;
+        const devices = [...tiles.values()].filter((t) => t.cfg.room === room.id);
+        if (!devices.length) continue;
+        if (ui.room === 'all') nodes.push(h('div.group-label', room.name));
+        devices.filter((t) => t.kind === 'ac').forEach(add);
+        devices.filter((t) => t.kind === 'light').forEach(add);
+      }
+      if (multiLevel && ui.room === 'all' && nodes.length > before) nodes.splice(before, 0, h('div.level-label', level.name));
     }
     if (!nodes.length) nodes.push(h('div.group-label', 'No devices in this room yet'));
     else if (isPhone && config.lights.some((l) => l.capabilities.length && inScope(l))) {
@@ -392,7 +432,7 @@ export function createPanel(root, config, store, { onFocus, onMenu }) {
         options.style.gridTemplateColumns = `repeat(${shown.filter(([, on]) => on).length || 1}, 1fr)`;
         powerBtn.classList.toggle('on', a.on);
         sub.replaceChildren(icon('thermo', 14), 'Room ', h('b', `${a.roomTemp.toFixed(1)}°C`),
-          h('span.live', { style: { background: a.on ? MODE_COLORS[a.mode] : 'rgba(255,255,255,.25)', boxShadow: a.on ? `0 0 8px ${MODE_COLORS[a.mode]}` : 'none' } }));
+          h('span.live', { style: { background: a.on ? MODE_COLORS[a.mode] : 'rgba(255,255,255,.25)', boxShadow: a.on && !a.idle ? `0 0 8px ${MODE_COLORS[a.mode]}` : 'none' } }));
         big.set(a.target, !a.on);
         slider.set(a.target);
         eco.classList.toggle('on', a.eco);
@@ -480,7 +520,7 @@ export function createPanel(root, config, store, { onFocus, onMenu }) {
     } else {
       const cfg = store.acCfg.get(hit.id);
       const s = state.acs[hit.id];
-      name = cfg.name; status = s.on ? `${MODE_LABEL[s.mode]} ${s.target}°` : 'Off'; on = s.on; color = MODE_COLORS[s.mode];
+      name = cfg.name; status = s.on ? `${s.idle ? 'Idle' : MODE_LABEL[s.mode]} ${s.target}°` : 'Off'; on = s.on && !s.idle; color = MODE_COLORS[s.mode];
     }
     tooltip.replaceChildren(h('i.dot'), name, h('span', status));
     tooltip.classList.toggle('on', on);
@@ -526,13 +566,20 @@ export function createPanel(root, config, store, { onFocus, onMenu }) {
       acsOn.length ? ` · AC ${acsOn[0].target}°` : '');
     power.classList.toggle('on', anyOn);
 
-    for (const [id, b] of sceneButtons) b.classList.toggle('active', state.scene === id);
+    for (const [id, b] of sceneButtons) b.classList.toggle('active', store.sceneActive(id));
 
     for (const [id, { b, count }] of roomButtons) {
       b.classList.toggle('active', ui.room === id);
       const n = config.lights.filter((l) => (id === 'all' || l.room === id) && state.lights[l.id].on).length;
       count.textContent = n;
       count.classList.toggle('zero', n === 0 || id === 'all');
+    }
+    for (const [id, { b, count }] of floorButtons) {
+      b.classList.toggle('active', ui.level === id);
+      b.setAttribute('aria-pressed', String(ui.level === id));
+      const n = config.lights.filter((l) => l.level === id && state.lights[l.id].on).length;
+      count.textContent = n;
+      count.classList.toggle('zero', n === 0);
     }
 
     const scoped = config.lights.filter(inScope);
@@ -556,7 +603,10 @@ export function createPanel(root, config, store, { onFocus, onMenu }) {
   return {
     canvas,
     card,
-    attach(w) { world = w; card.classList.remove('booting'); },
+    attach(w) { world = w; card.classList.remove('booting'); levelShown(w.level); },
+    /** The model went to another floor by itself (a room or a device on it was picked). */
+    levelShown,
+    viewMoved(moved) { viewReset.classList.toggle('show', moved); },
     showTooltip,
     openSheet,
     closeSheet,
@@ -565,6 +615,14 @@ export function createPanel(root, config, store, { onFocus, onMenu }) {
     get room() { return ui.room; },
     setNotch(x) { card.style.setProperty('--notch-x', `${x}px`); },
     setAgentLive(live) { aiBadge.hidden = !live; },
+    /** The stage and the controls moved (a Duo folded or opened): the controls settle in place. */
+    relayout() {
+      card.classList.remove('relayout');
+      void card.offsetWidth; // restarts the animation
+      card.classList.add('relayout');
+      clearTimeout(card.relayoutTimer);
+      card.relayoutTimer = setTimeout(() => card.classList.remove('relayout'), 600);
+    },
     /** `ai`: something an AI assistant did (who, what), instead of an error. */
     toast(text, ai = null) {
       toastEl.replaceChildren(...(ai ? [h('span.toast-ai', icon('sparkles', 13, 2.2), ai), h('span', text)] : [text]));

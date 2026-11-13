@@ -1,8 +1,10 @@
 html.mode-editor body { background: var(--bg); overflow: hidden; }
-html.mode-editor #app { padding: 0; display: block; }
+/* place-items from the panel's #app would shrink the editor where block layout honours it (Chrome, Android). */
+html.mode-editor #app { padding: 0; display: block; place-items: normal; }
 html.mode-editor, html.mode-editor body { user-select: none; }
 
 .editor {
+  width: 100%;
   height: 100%;
   display: grid;
   grid-template-columns: 268px minmax(0, 1fr) 340px;
@@ -120,7 +122,95 @@ html.mode-editor, html.mode-editor body { user-select: none; }
 .p-light.sel circle:not(.halo), .p-light.sel rect { stroke: #fff; stroke-width: 0.08; }
 .p-light.sel .halo { fill: rgba(255, 255, 255, 0.2); }
 
-.p-handle { fill: #6aa6ff; stroke: #fff; stroke-width: 0.05; cursor: nwse-resize; }
+.p-handle { fill: #6aa6ff; stroke: #fff; vector-effect: non-scaling-stroke; stroke-width: 1.5px; }
+.p-handle.nw, .p-handle.se, .grab.nw, .grab.se { cursor: nwse-resize; }
+.p-handle.ne, .p-handle.sw, .grab.ne, .grab.sw { cursor: nesw-resize; }
+.p-handle.n, .p-handle.s, .grab.n, .grab.s { cursor: ns-resize; }
+.p-handle.e, .p-handle.w, .grab.e, .grab.w { cursor: ew-resize; }
+.hit.grab { fill: transparent; stroke: none; }
+.p-guide { stroke: #ff6ad5; stroke-width: 1px; vector-effect: non-scaling-stroke; stroke-dasharray: 5 4; pointer-events: none; }
+
+/* the floor under the one being edited */
+.p-ghost { pointer-events: none; }
+.p-ghost rect { fill: rgba(255, 255, 255, 0.025); stroke: rgba(160, 190, 255, 0.4); stroke-width: 1px; vector-effect: non-scaling-stroke; stroke-dasharray: 6 5; }
+.p-ghost-label { text-anchor: middle; font: 600 0.22px -apple-system, system-ui, sans-serif; fill: rgba(160, 190, 255, 0.38); }
+.p-ghost .p-ghost-stairs { fill: rgba(160, 190, 255, 0.12); stroke-dasharray: none; }
+.p-ghost-step, .p-ghost-arrow { stroke: rgba(160, 190, 255, 0.5); stroke-width: 1px; vector-effect: non-scaling-stroke; fill: none; }
+
+.p-furn.stairs rect { fill: rgba(217, 212, 203, 0.16); stroke: rgba(255, 255, 255, 0.5); }
+.p-stairs-step { stroke: rgba(255, 255, 255, 0.35); stroke-width: 0.02; pointer-events: none; }
+.p-stairs-arrow { stroke: #ffd38a; stroke-width: 0.05; stroke-linecap: round; stroke-linejoin: round; fill: none; pointer-events: none; }
+.p-furn.stairs.sel rect { fill: rgba(90, 150, 255, 0.28); }
+
+.plan.can-pan, .plan.can-pan * { cursor: grab !important; }
+.plan.panning, .plan.panning * { cursor: grabbing !important; }
+
+/* ---------- floors, zoom and the add bar, over the plan ---------- */
+
+.levels {
+  position: absolute; left: 12px; top: 12px; z-index: 3; max-width: calc(100% - 24px);
+  display: flex; gap: 3px; padding: 3px; border-radius: 13px; overflow-x: auto; scrollbar-width: none;
+  background: rgba(16, 21, 36, 0.82); border: 1px solid var(--line);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+}
+.levels::-webkit-scrollbar { display: none; }
+.level-tab, .level-add {
+  flex: none; height: 30px; padding: 0 11px; border-radius: 10px; display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12.5px; font-weight: 600; color: var(--muted); white-space: nowrap;
+  transition: background 160ms, color 160ms, transform 200ms var(--spring);
+}
+.level-tab:hover, .level-add:hover { background: var(--glass-hi); color: var(--text); }
+.level-tab:active, .level-add:active { transform: scale(0.95); }
+.level-tab .n { font-size: 10.5px; font-weight: 700; color: var(--faint); }
+.level-tab.active { color: #fff; background: rgba(70, 130, 255, 0.5); }
+.level-tab.active .n { color: rgba(255, 255, 255, 0.7); }
+.level-add { color: #8fbaff; padding: 0 10px; }
+
+.zoom {
+  position: absolute; right: 12px; bottom: 12px; z-index: 3; display: flex; flex-direction: column; gap: 2px; padding: 3px;
+  border-radius: 12px; background: rgba(16, 21, 36, 0.82); border: 1px solid var(--line);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+}
+.zoom button { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; color: var(--muted); }
+.zoom button:hover { background: var(--glass-hi); color: var(--text); }
+
+.add-bar {
+  position: absolute; left: 50%; bottom: 12px; z-index: 3; transform: translateX(-50%); max-width: calc(100% - 124px);
+  display: flex; gap: 2px; padding: 4px; border-radius: 15px; overflow-x: auto; scrollbar-width: none;
+  background: rgba(16, 21, 36, 0.86); border: 1px solid var(--line); box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.6);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+}
+.add-bar::-webkit-scrollbar { display: none; }
+.add-bar button {
+  flex: none; min-width: 56px; height: 50px; padding: 0 8px; border-radius: 11px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  font-size: 10.5px; font-weight: 600; color: var(--muted);
+  transition: background 140ms, color 140ms, transform 200ms var(--spring);
+}
+.add-bar button:hover { background: rgba(70, 130, 255, 0.25); color: #fff; }
+.add-bar button:active { transform: scale(0.94); }
+
+.empty-card {
+  position: absolute; left: 50%; top: 50%; z-index: 3; transform: translate(-50%, -50%); width: min(340px, calc(100% - 32px));
+  padding: 18px; border-radius: 18px; text-align: center;
+  background: rgba(16, 21, 36, 0.9); border: 1px solid var(--line); box-shadow: 0 16px 40px -14px rgba(0, 0, 0, 0.7);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+}
+.empty-card[hidden] { display: none; }
+.empty-card b { font-size: 14px; }
+.empty-card p { margin: 6px 0 14px; color: var(--muted); line-height: 1.45; }
+.empty-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+
+.level-row .icon { flex: none; color: var(--faint); }
+.level-row.current .icon { color: #8fbaff; }
+.level-row.current .row-name { color: var(--text); }
+
+dl.keys { margin: 0; font-size: 12px; line-height: 1.4; }
+dl.keys dt { color: var(--text); font-weight: 600; margin-top: 7px; }
+dl.keys dt:first-child { margin-top: 0; }
+dl.keys dd { margin: 0; color: var(--muted); }
+.btn.danger { color: #ff9a90; }
+.btn.danger[data-armed] { color: #fff; background: rgba(220, 60, 50, 0.7); border-color: rgba(255, 120, 110, 0.6); }
 
 /* ---------- right column ---------- */
 
@@ -264,4 +354,214 @@ html.mode-editor, html.mode-editor body { user-select: none; }
 @media (prefers-reduced-motion: reduce) {
   .press-button span { animation: none; box-shadow: 0 0 0 3px rgba(60, 140, 255, 0.55); }
   .note.busy .icon { animation-duration: 2.4s; }
+}
+
+
+/* ---------- iPhone ---------- */
+
+html.ios.mode-editor body { background: var(--bg); }
+.editor.phone {
+  --safe-top: var(--safe-top-preview, env(safe-area-inset-top, 0px));
+  --safe-bottom: var(--safe-bottom-preview, env(safe-area-inset-bottom, 0px));
+  --bar-h: calc(var(--safe-top) + 54px);
+  --tools-h: calc(var(--safe-bottom) + 62px);
+  --peek-h: min(40vh, 360px);
+  position: relative; display: block; height: 100%; overflow: hidden; font-size: 15px;
+}
+.p-bar {
+  position: absolute; left: 0; right: 0; top: 0; z-index: 5; height: var(--bar-h);
+  display: flex; align-items: center; gap: 4px; padding: var(--safe-top) 10px 0;
+  /* A top corner something stands over (iPhone Duo's status bar, reported by the app as
+     --corner-left/right): the buttons there move in past it. */
+  padding-left: max(10px, calc(var(--corner-left, 0px) + 4px));
+  padding-right: max(10px, calc(var(--corner-right, 0px) + 4px));
+  background: linear-gradient(180deg, rgba(10, 14, 26, 0.96), rgba(10, 14, 26, 0.82));
+  border-bottom: 1px solid var(--line);
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+}
+.p-bar .title-input { flex: 1; min-width: 0; max-width: none; height: 40px; font-size: 17px; text-align: center; padding: 0 6px; }
+.p-icon {
+  flex: none; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; color: var(--text);
+  transition: background 140ms, opacity 140ms, transform 200ms var(--spring);
+}
+.p-icon:active { background: var(--glass-hi); transform: scale(0.92); }
+.p-icon:disabled { opacity: 0.3; }
+.p-icon.danger { color: #ff8a80; }
+.p-save {
+  flex: none; height: 36px; min-width: 66px; margin-left: 4px; padding: 0 14px; border-radius: 12px;
+  font-size: 15px; font-weight: 650; color: #7fb2ff; transition: background 160ms, color 160ms, transform 200ms var(--spring);
+}
+.p-save.primary { color: #fff; background: linear-gradient(180deg, #4f97ff, #2f7bf2); box-shadow: 0 6px 16px -6px rgba(61, 139, 255, 0.8); }
+.p-save:active { transform: scale(0.94); }
+.p-save:disabled { opacity: 0.4; }
+
+.editor.phone .canvas {
+  position: absolute; left: 0; right: 0; top: var(--bar-h); bottom: var(--tools-h);
+  transition: bottom 320ms var(--ease);
+}
+.editor.phone[data-sheet='peek'] .canvas { bottom: calc(var(--peek-h) + var(--tools-h) - 12px); }
+.editor.phone .plan { position: absolute; inset: 0; }
+.editor.phone .hint { bottom: 12px; font-size: 12.5px; padding: 0 20px; transition: opacity 200ms; }
+.editor.phone:not([data-sheet='closed']) .hint { opacity: 0; }
+.p-preview { position: absolute; inset: 0; display: none; background: #0a0e1a; }
+.canvas.show-3d .p-preview { display: block; }
+.canvas.show-3d .plan, .canvas.show-3d .p-float, .canvas.show-3d .hint { visibility: hidden; }
+.p-preview .chip { top: 12px; right: 12px; height: 32px; padding: 0 12px; font-size: 13px; }
+.p-float {
+  position: absolute; right: 12px; top: 12px; width: 40px; height: 40px; border-radius: 13px; display: grid; place-items: center;
+  color: var(--muted); background: rgba(16, 21, 36, 0.82); border: 1px solid var(--line);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+.p-float:active { color: var(--text); transform: scale(0.94); }
+.editor.phone .levels { right: auto; max-width: calc(100% - 76px); padding: 3px; border-radius: 14px; }
+/* The "whole floor" button sits in the plan's top trailing corner: below whatever covers that
+   corner of the screen (iPhone Duo's status bar) when it reaches down past the top bar. */
+.editor.phone .p-float { top: max(12px, calc(var(--corner-top, 0px) - var(--bar-h) + 8px)); }
+.editor.phone .level-tab, .editor.phone .level-add { height: 34px; font-size: 13.5px; border-radius: 11px; }
+.editor.phone .empty-card { font-size: 14px; }
+.editor.phone .empty-actions .btn { height: 40px; font-size: 14px; }
+.canvas.show-3d .empty-card { visibility: hidden; }
+.canvas.show-3d .levels { z-index: 4; }
+.p-issue {
+  position: absolute; left: 12px; right: 60px; top: 60px; display: none; padding: 9px 12px; border-radius: 12px;
+  font-size: 13px; line-height: 1.35; color: #ffd2cc; background: rgba(80, 22, 22, 0.88); border: 1px solid rgba(255, 120, 110, 0.5);
+}
+.p-issue.show { display: block; }
+
+.editor.phone .hit { fill: transparent; stroke: none; }
+.editor.phone .p-hit { stroke: transparent; stroke-width: 0.6; }
+.editor.phone .p-room rect, .editor.phone .p-furn rect, .editor.phone .p-light, .editor.phone .p-ac rect, .editor.phone .p-open { cursor: default; }
+.editor.phone .p-room:hover rect { filter: none; }
+
+.p-tools {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; height: var(--tools-h);
+  display: grid; grid-template-columns: repeat(4, 1fr); padding: 4px 8px var(--safe-bottom);
+  background: rgba(10, 14, 26, 0.94); border-top: 1px solid var(--line);
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+}
+.p-tool { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 11px; font-weight: 600; color: var(--muted); border-radius: 14px; }
+.p-tool:active { color: var(--text); background: var(--glass); }
+
+/* the details sheet */
+.p-sheet {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 5; height: var(--peek-h);
+  display: flex; flex-direction: column;
+  background: #121828; border-top: 1px solid rgba(255, 255, 255, 0.12); border-radius: 22px 22px 0 0;
+  box-shadow: 0 -18px 50px rgba(0, 0, 0, 0.55);
+  transition: height 320ms var(--ease), transform 320ms var(--ease), bottom 320ms var(--ease);
+}
+.p-sheet[data-state='peek'] { bottom: calc(var(--tools-h) - 12px); box-shadow: 0 -12px 34px rgba(0, 0, 0, 0.45); }
+.p-sheet[data-state='peek'] .inspector { padding-bottom: 28px; }
+.p-sheet[data-state='closed'] { transform: translateY(105%); }
+.p-sheet[data-state='full'] { z-index: 7; height: calc(100% - var(--bar-h) - 6px); }
+.p-sheet.dragging { transition: none; }
+.p-grip { flex: none; height: 22px; display: grid; place-items: center; touch-action: none; }
+.p-grip span { width: 38px; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.25); }
+.editor.phone .inspector { flex: 1; padding: 0 18px calc(var(--safe-bottom) + 24px); -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.editor.phone .insp-head {
+  position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 6px; margin: 0 -18px; padding: 0 12px 10px 18px;
+  background: #121828; touch-action: none;
+}
+.insp-titles { flex: 1; min-width: 0; }
+.editor.phone .insp-head h2 { font-size: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.editor.phone .insp-head span { font-size: 12.5px; }
+.p-head-actions { display: flex; gap: 2px; }
+.editor.phone .svc-head { position: static; margin: 0; padding: 0; }
+.editor.phone .block { margin-top: 20px; }
+.editor.phone .block h3, .editor.phone .devices-list h3 { font-size: 11.5px; margin-bottom: 10px; }
+.editor.phone .field > span { font-size: 13px; margin-bottom: 6px; }
+.editor.phone .field input:not([type='checkbox']), .editor.phone .field select { height: 44px; font-size: 16px; border-radius: 12px; padding: 0 12px; }
+.editor.phone .field select { background-position: calc(100% - 17px) 20px, calc(100% - 12px) 20px; padding-right: 30px; }
+.editor.phone .fields { gap: 10px; }
+.editor.phone .checks .field { min-height: 40px; }
+.editor.phone .checks .field > span { font-size: 15px; }
+.editor.phone .checks input { width: 22px; height: 22px; }
+.editor.phone .note { font-size: 13px; }
+.editor.phone .steps { font-size: 14px; }
+.editor.phone .btn { height: 44px; font-size: 15px; border-radius: 13px; padding: 0 16px; }
+.editor.phone .btn.wide { height: 48px; }
+.editor.phone .btn.danger { color: #ff8a80; }
+.editor.phone .back-link { font-size: 15px; padding: 6px 10px 6px 4px; margin-bottom: 12px; }
+.editor.phone .svc-card { padding: 14px; border-radius: 16px; }
+.editor.phone .svc-text b { font-size: 15.5px; }
+.editor.phone .svc-text span { font-size: 13px; }
+.editor.phone .svc-status { font-size: 12.5px; }
+.editor.phone .device { padding: 10px 12px; }
+.editor.phone .device b { font-size: 15px; }
+.editor.phone .device div span { font-size: 12.5px; }
+.editor.phone .tuya-row { height: 48px; padding: 0 12px; border-radius: 14px; background: var(--glass); border: 1px solid var(--line); font-size: 15px; }
+
+/* list, add and confirm sheets */
+.p-scrim { position: absolute; inset: 0; z-index: 7; background: rgba(0, 0, 0, 0.45); opacity: 0; pointer-events: none; transition: opacity 240ms; }
+.p-scrim.open { opacity: 1; pointer-events: auto; }
+.p-modal {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 8; max-height: calc(100% - var(--safe-top) - 40px);
+  display: flex; flex-direction: column; padding: 0 0 var(--safe-bottom);
+  background: #141a2b; border-radius: 22px 22px 0 0; border-top: 1px solid rgba(255, 255, 255, 0.12);
+  transform: translateY(105%); transition: transform 340ms var(--ease); pointer-events: none;
+}
+.p-modal.open { transform: none; pointer-events: auto; }
+.p-modal-head { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 16px 18px 8px; }
+.p-modal-head b { font-size: 17px; font-weight: 650; }
+.p-text { font-size: 16px; font-weight: 600; color: #7fb2ff; padding: 6px 2px; }
+.p-list { flex: 1; overflow-y: auto; padding: 0 12px 16px; border: 0; -webkit-overflow-scrolling: touch; }
+.p-list .row { min-height: 46px; font-size: 15.5px; padding: 0 12px; }
+.p-list .row-sub { font-size: 13px; }
+.p-list .row .del { display: none !important; }
+.p-list .row:hover .row-sub { display: block; }
+.p-list .group { font-size: 12px; margin: 18px 8px 6px; }
+.p-list .group .add { width: 30px; height: 30px; border-radius: 10px; }
+.p-list .home-row, .p-list .tuya-row { height: 48px; }
+.p-add-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 8px 16px 18px; }
+.p-add-item {
+  height: 96px; border-radius: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px;
+  font-size: 13px; font-weight: 600; color: var(--text); background: var(--glass); border: 1px solid var(--line);
+  transition: transform 200ms var(--spring), background 140ms;
+}
+.p-add-item:active { transform: scale(0.95); background: var(--glass-hi); }
+.p-add-item .icon { color: var(--warm); }
+.p-confirm .note { padding: 0 18px; font-size: 14px; }
+.p-confirm-actions { display: grid; gap: 10px; padding: 16px 18px 18px; }
+.editor.phone .toast { bottom: calc(var(--tools-h) + 14px); font-size: 14px; max-width: calc(100% - 40px); text-align: center; z-index: 9; }
+.editor.phone[data-sheet='peek'] .toast { bottom: calc(var(--peek-h) + var(--tools-h)); }
+
+/* iPhone Duo open, or any wide window: the details dock on the trailing half, beside the
+   plan instead of over it, and the item lists open as cards in the middle. */
+@media (min-width: 720px) and (min-aspect-ratio: 23/20) {
+  .editor.phone {
+    --side-w: min(480px, max(360px, calc(50% - 20px)));
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+  }
+  .p-bar {
+    padding-left: max(10px, var(--safe-left), calc(var(--corner-left, 0px) + 4px));
+    padding-right: max(10px, var(--safe-right), calc(var(--corner-right, 0px) + 4px));
+  }
+  .editor.phone .canvas { transition: right 320ms var(--ease); }
+  .editor.phone[data-sheet='peek'] .canvas, .editor.phone[data-sheet='full'] .canvas { bottom: var(--tools-h); right: var(--side-w); }
+  .p-sheet, .p-sheet[data-state='peek'], .p-sheet[data-state='full'] {
+    left: auto; right: 0; top: var(--bar-h); bottom: var(--tools-h); z-index: 5; width: var(--side-w); height: auto;
+    border-radius: 0; border-top: 0; border-left: 1px solid var(--line); box-shadow: none;
+  }
+  .p-sheet[data-state='closed'] { transform: translateX(105%); }
+  .p-sheet .inspector { padding-top: 14px; padding-right: max(18px, var(--safe-right)); }
+  .p-grip { display: none; }
+  /* The status bar sits in the top trailing corner of iPhone Duo's open screen, a little
+     wider than its safe area: the header's buttons keep clear of it. */
+  .editor.phone .insp-head { padding-top: 4px; padding-right: 30px; touch-action: auto; }
+  .p-tools { padding-left: max(8px, var(--safe-left)); padding-right: max(8px, var(--safe-right)); }
+  .p-tools .p-tool { max-width: 160px; justify-self: center; width: 100%; }
+  .p-modal {
+    left: 50%; right: auto; bottom: auto; top: 50%; width: min(520px, calc(100% - 40px)); max-height: calc(100% - var(--bar-h) - 40px);
+    padding-bottom: 6px; border-radius: 22px; border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+    opacity: 0; pointer-events: none; transform: translate(-50%, -46%) scale(0.97);
+    transition: transform 300ms var(--ease), opacity 200ms ease;
+  }
+  .p-modal.open { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%); }
+  .editor.phone[data-sheet='peek'] .toast, .editor.phone[data-sheet='full'] .toast { bottom: calc(var(--tools-h) + 14px); left: calc((100% - var(--side-w)) / 2); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .p-sheet, .p-modal, .editor.phone .canvas, .p-scrim { transition-duration: 1ms; }
 }

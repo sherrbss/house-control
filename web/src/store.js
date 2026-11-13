@@ -16,6 +16,8 @@ function defaultAC(cfg, outdoor) {
   return {
     on: false, target: 24, mode: 'cool', fan: 'auto', swing: 'swing',
     sleep: false, eco: false, roomTemp: Math.min(outdoor - 2, 27),
+    // On but not running right now (a real thermostat says so); never sent to a device.
+    idle: false,
   };
 }
 
@@ -132,6 +134,9 @@ export function createStore(config) {
     const clean = sanitizeLight(id, patch);
     // Only what actually changed is worth sending to the device.
     const diff = Object.fromEntries(Object.entries(clean).filter(([k, v]) => cur[k] !== v));
+    // Learned IR power is an estimate. Explicit room/scene commands must reach
+    // the blaster even if a handheld remote changed the actual lamp meanwhile.
+    if (!remote && lightCfg.get(id).tuya?.sceneSwitch && 'on' in clean) diff.on = clean.on;
     if (!Object.keys(diff).length) return false;
     const before = Object.fromEntries(Object.keys(diff).map((k) => [k, cur[k]]));
     Object.assign(cur, clean);
@@ -145,13 +150,22 @@ export function createStore(config) {
     if (!cur) return false;
     const clean = { ...patch };
     if ('target' in clean) clean.target = clamp(Math.round(clean.target), cfg.min, cfg.max);
+    // Switched on here: running until the thermostat says otherwise at the next poll.
+    if (!remote && clean.on === true && !cur.on) clean.idle = false;
     const diff = Object.fromEntries(Object.entries(clean).filter(([k, v]) => cur[k] !== v));
     if (!Object.keys(diff).length) return false;
     const before = Object.fromEntries(Object.keys(diff).map((k) => [k, cur[k]]));
     Object.assign(cur, clean);
-    const { roomTemp, ...sendable } = diff;
+    const { roomTemp, idle, ...sendable } = diff;
     if (!remote && Object.keys(sendable).length) dispatch('ac', id, sendable, before);
     return true;
+  }
+
+  // The devices a scene switches on: named ones, or every one when "*" turns them on.
+  function sceneTargets(scene, kind = 'lights') {
+    const rules = scene[kind] || {};
+    const all = Object.keys(kind === 'lights' ? state.lights : state.acs);
+    return all.filter((id) => (rules[id]?.on ?? rules['*']?.on) === true);
   }
 
   function summary() {
@@ -200,9 +214,24 @@ export function createStore(config) {
       if (writeAC(id, patch)) emit({ type: 'ac', id });
     },
 
+    /** True while a scene is in force: an on/off scene while any lamp it turns on is lit. */
+    sceneActive(sceneId) {
+      const scene = config.scenes.find((s) => s.id === sceneId);
+      if (!scene?.toggle) return state.scene === sceneId;
+      return sceneTargets(scene).some((id) => state.lights[id]?.on);
+    },
+
     applyScene(sceneId) {
       const scene = config.scenes.find((s) => s.id === sceneId);
       if (!scene) return;
+      // An on/off scene ("Living room") a second time turns its lamps (and ACs) off again.
+      if (scene.toggle && store.sceneActive(sceneId)) {
+        for (const id of sceneTargets(scene)) writeLight(id, { on: false });
+        for (const id of sceneTargets(scene, 'acs')) writeAC(id, { on: false });
+        if (state.scene === sceneId) state.scene = null;
+        emit({ type: 'bulk' });
+        return;
+      }
       for (const id of Object.keys(state.lights)) {
         const patch = { ...(scene.lights['*'] || {}), ...(scene.lights[id] || {}) };
         // A scene that sets a white temperature should not be overridden by a stale colour.

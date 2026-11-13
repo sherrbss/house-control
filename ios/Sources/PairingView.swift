@@ -34,11 +34,12 @@ struct PairingView: View {
             .padding(.horizontal, 18)
             .padding(.top, 8)
             .padding(.bottom, 32)
+            .readableWidth()
             .animation(.spring(response: 0.5, dampingFraction: 0.85), value: paired)
             .animation(.easeOut(duration: 0.2), value: rejected)
         }
         .background(Theme.background)
-        .navigationTitle("Pair with Mac")
+        .navigationTitle("Pair with Mac or PC")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Theme.background, for: .navigationBar)
         .task { await prepareCamera() }
@@ -51,8 +52,8 @@ struct PairingView: View {
     private var steps: some View {
         Card(padding: 16) {
             VStack(alignment: .leading, spacing: 14) {
-                step(1, "On your Mac, right-click the House Control icon in the menu bar.")
-                step(2, "Choose **Pair iPhone…** — a code appears.")
+                step(1, "On your computer, right-click the House Control icon: in the menu bar on a Mac, in the taskbar's tray on a PC.")
+                step(2, "Choose **Pair Phone…** (**Pair iPhone…** in older versions) — a code appears.")
                 step(3, "Point this iPhone at the code. Both devices need to be on the same Wi-Fi.")
             }
         }
@@ -86,7 +87,7 @@ struct PairingView: View {
                             "Allow the camera for House Control in Settings, or paste the pairing link below.")
             case .unavailable:
                 placeholder("qrcode.viewfinder", "No camera here",
-                            "Use Copy Pairing Link on the Mac and paste it below.")
+                            "Use Copy Pairing Link on the computer and paste it below.")
             case .unknown:
                 ProgressView().tint(Theme.muted)
             }
@@ -116,7 +117,7 @@ struct PairingView: View {
             .labelStyle(.titleAndIcon)
             .buttonBorderShape(.capsule)
             .tint(Theme.accent)
-            Text("Or press **Copy Pairing Link** on the Mac and paste it here.")
+            Text("Or press **Copy Pairing Link** on the computer and paste it here.")
                 .font(.system(size: 13))
                 .foregroundStyle(Theme.faint)
                 .multilineTextAlignment(.center)
@@ -150,10 +151,10 @@ struct PairingView: View {
     private var statusLine: String {
         switch model.syncStatus {
         case .connected:
-            return model.hasCustomPlan ? "Your floor plan is here and will follow the Mac from now on."
-                : "Connected. Draw your home in the Mac's editor and it appears here."
+            return model.hasCustomPlan ? "Connected. Your floor plan now stays the same on both, whichever one you edit."
+                : "Connected. Draw your home here or on the computer; it appears on both."
         case .failed(let reason): return reason
-        default: return "Looking for the Mac on this Wi-Fi…"
+        default: return "Looking for the computer on this Wi-Fi…"
         }
     }
 

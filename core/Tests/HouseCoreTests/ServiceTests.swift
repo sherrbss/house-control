@@ -81,10 +81,21 @@ final class ServiceTests: XCTestCase {
         XCTAssertEqual(reading.ac?["fan"] as? String, "high")
         XCTAssertEqual(reading.ac?["swing"] as? String, "off")
         XCTAssertEqual(reading.ac?["eco"] as? Bool, true)
+        XCTAssertEqual(reading.ac?["idle"] as? Bool, false)
         XCTAssertEqual(reading.features?["modes"] as? [String], ["cool", "heat", "dry", "fan", "auto"])
         XCTAssertEqual(reading.features?["fans"] as? [String], ["low", "high"])
         XCTAssertEqual(reading.features?["eco"] as? Bool, true)
         XCTAssertEqual(reading.features?["sleep"] as? Bool, false)
+        // A thermostat that is on but whose room is already warm enough is idle, not heating.
+        func idle(_ state: String, _ action: String?) -> Bool? {
+            var attributes: [String: Any] = ["hvac_modes": ["off", "heat"], "temperature": 21]
+            attributes["hvac_action"] = action
+            return HomeAssistantService.reading(from: ["entity_id": "climate.heater", "state": state, "attributes": attributes]).ac?["idle"] as? Bool
+        }
+        XCTAssertEqual(idle("heat", "idle"), true)
+        XCTAssertEqual(idle("heat", "heating"), false)
+        XCTAssertEqual(idle("heat", nil), false)
+        XCTAssertEqual(idle("off", "off"), false)
         // A heat_cool-only thermostat reports a range instead of one set-point.
         let range = HomeAssistantService.reading(from: [
             "entity_id": "climate.ecobee", "state": "heat_cool",
@@ -246,13 +257,6 @@ final class ServiceTests: XCTestCase {
         hub.command(["id": "sim", "kind": "light", "patch": ["on": true]]) { simulated = $0 }
         XCTAssertEqual(simulated?["ok"] as? Bool, true)
         XCTAssertTrue(fake.sent.count == 1)
-    }
-
-    func testSmartLifeDevicesGetAKind() {
-        XCTAssertEqual(DeviceHub.smartLifeDevice(["id": "1", "category": "dj", "codes": ["switch_led", "bright_value_v2", "temp_value_v2"]])["kind"] as? String, "light")
-        XCTAssertEqual(DeviceHub.smartLifeDevice(["id": "2", "category": "infrared_ac", "codes": ["PowerOn", "T"]])["kind"] as? String, "ac")
-        XCTAssertEqual(DeviceHub.smartLifeDevice(["id": "3", "category": "wsdcg", "codes": ["temp_current"]])["kind"] as? String, "sensor")
-        XCTAssertEqual(DeviceHub.smartLifeDevice(["id": "1", "category": "dj", "codes": ["switch_led", "bright_value_v2"]])["capabilities"] as? [String], ["brightness"])
     }
 
     // MARK: - A real Home Assistant (opt-in)

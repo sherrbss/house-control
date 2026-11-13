@@ -22,7 +22,8 @@
 ## What it does
 
 - **Lives in the menu bar.** Click the house icon and a panel drops down; click anywhere else and it is gone.
-- **Your floor plan in 3D.** Rooms, walls, doors, windows and furniture are built from one JSON file.
+- **Your floor plan in 3D.** Rooms, walls, doors, windows and furniture are built from one JSON file. Turn it all the
+  way round and move it around: on the Mac drag to turn, two fingers on the trackpad to move, pinch to zoom.
   Lamps light the scene the way they light the room; an AC that is running blows visible air.
 - **Lights.** Tap to toggle, drag across a tile to dim, open a light for brightness, white temperature and colour.
 - **Air conditioners.** Power, target temperature, mode and fan speed, with the room temperature from a real sensor if you have one.
@@ -35,7 +36,11 @@
 - **AI Access.** Give ChatGPT, Claude or any AI assistant a private link — or connect it over MCP — and it runs your
   lights and air conditioners, and rebuilds rooms in the 3D model from your photos. Served by your Mac; Stop ends it.
   See [AI Access](#ai-access).
-- **An iPhone app.** The same home in your pocket, kept in sync with the Mac over your own Wi-Fi.
+- **Widgets and controls.** The home in 3D on the iPhone's Home Screen and the Mac's desktop, scenes, lamps and
+  air conditioners a tap away, Lock Screen and Control Center controls, and quick actions on the app icon.
+  See [Widgets](#widgets).
+- **An iPhone app that needs no Mac.** Draw the home, connect Smart Life, Home Assistant, Hue and Apple Home and
+  link the devices, all on the phone. Pair a Mac later and both stay in sync, whichever one you edit.
   See [iPhone app](#iphone-app).
 - **Works without any hardware.** Until you sign in, every device is simulated, so you can try everything first.
 
@@ -57,6 +62,8 @@ No frameworks, no Electron, no server, no account of its own.
    - Or, in Terminal: `xattr -dr com.apple.quarantine "/Applications/House Control.app"`
 4. Look for the house in the menu bar — there is no Dock icon and no window. Click it.
 
+What is new in each release: [CHANGELOG.md](CHANGELOG.md).
+
 It starts with a bundled demo plan, so you can try everything before connecting anything. Then:
 [make it your home](#make-it-your-home) and [connect real devices](#connect-real-devices).
 To start it with your Mac, add it under **System Settings → General → Login Items**.
@@ -72,6 +79,8 @@ gh attestation verify HouseControl-<version>.dmg --repo 0xProbabillity/house-con
 ```
 
 The second command proves the image was built by this repository's workflow, and shows from which commit.
+Images from 1.0.0 on carry an attestation; 0.1.0 was built while the repository was still private, when GitHub
+does not store attestations for free accounts, so for it only the SHA-256 can be checked.
 
 ### Why the app is not notarized
 
@@ -109,17 +118,22 @@ The app is signed ad hoc. If you rebuild often and use iPhone sync, sign it with
 macOS does not ask for the Local Network permission after every build:
 `CODESIGN_IDENTITY="Apple Development: you@example.com (ABCDE12345)" ./scripts/build-app.sh`.
 
-To keep it, drag `build/HouseControl.app` into `/Applications`. To start it with your Mac, add it under
-**System Settings → General → Login Items**.
+To keep it, drag `build/HouseControl.app` into `/Applications`. To start it with your Mac, turn on **Open at
+Login** in **Settings** (⌘, or the menu bar icon's right-click menu → **Settings…**); it shows up under
+**System Settings → General → Login Items**, where it can be switched off too.
 
-There is no Dock icon and no main window: look for the house in the menu bar.
+There is no Dock icon and no main window: look for the house in the menu bar. Its **Settings** window (⌘, from any
+House Control window, or **Settings…** in the right-click menu and the panel's gear menu) has everything in one place:
+Open at Login and the island, your floor plans, Smart Life, Home Assistant, Hue and Apple Home, iPhone pairing,
+AI Access and About.
 
 ## Using it
 
 | Do this | To get this |
 | --- | --- |
 | Click the menu bar icon | Open or close the panel |
-| Right-click the menu bar icon | Edit Home, Load Floor Plan, Reveal Plan File, Reveal Device Log, Show Island, Pair iPhone, AI Access, Reload, Quit |
+| Right-click the menu bar icon | Settings, Edit Home, Load Floor Plan, Reveal Plan File, Reveal Device Log, Show Island, Open at Login, Pair Phone, AI Access, Reload, Quit |
+| `⌘,` | Settings |
 | Click a lamp in the 3D view, or its tile | Toggle it |
 | Drag sideways across a light tile | Dim it |
 | Click the sliders icon on a light tile | Brightness, white temperature, colour |
@@ -180,7 +194,19 @@ Details, every tool, and the privacy model: [docs/ai-access.md](docs/ai-access.m
 </p>
 
 The iPhone app is the panel made for a thumb: tap a lamp in the 3D view or its tile, drag across a tile to dim,
-touch and hold a light for brightness and colour, pinch the model to zoom, swipe in from the left edge to go back.
+touch and hold a light for brightness and colour, turn the model all the way round with one finger, move it and pinch to zoom with two, swipe in from the left edge to go back.
+
+It needs no Mac. Everything is set up on the phone, under **Settings** (the sliders button):
+
+- **New home** starts your own plan — one room, or the Studio or Apartment layout to adapt — and opens the editor.
+- **Edit floor plan** is the Mac's editor laid out for a finger: tap a room, lamp or AC to select it, drag what is
+  selected, drag anywhere else to pan, pinch to zoom. Its details come up in a sheet from the bottom; **Add**,
+  **Items**, **3D** and **Home** sit along the bottom edge. **Save** keeps the plan on the phone (and sends it to a
+  paired Mac).
+- **Devices** lists every lamp and AC of the plan by room; tap one and pick its real device from everything your
+  connected platforms have, or **Add devices to a room** to put several in at once, already linked.
+- **Smart Life**, **Home Assistant**, **Philips Hue** and **Apple Home** connect right there. Home Assistant servers
+  and Hue Bridges on the Wi-Fi are found by themselves.
 
 Try it in the simulator:
 
@@ -189,33 +215,106 @@ Try it in the simulator:
 ```
 
 To put it on a phone, write your Apple developer team into `ios/Config/Local.xcconfig`
-(`DEVELOPMENT_TEAM = ABCDE12345`), run `cd ios && xcodegen generate`, open `ios/HouseControl.xcodeproj` and run it
-on your device. `./scripts/build-ios.sh --upload` archives it and sends it to TestFlight; the script lists what it needs.
+(`DEVELOPMENT_TEAM = ABCDE12345`), run `cd ios && xcodegen generate --spec project-smartlife.yml`, open
+`ios/HouseControl.xcodeproj` and run it on your device. `./scripts/build-ios.sh --upload` archives it and sends it to
+TestFlight; the script lists what it needs.
 
-### Sync with the Mac
+The iPhone app comes in two editions, built from the same code:
 
-Your floor plan — rooms, furniture, lamps, scenes and the links to real devices — is drawn on the Mac and travels
-to the phone by itself.
+| Edition | What it has | Built from |
+| --- | --- | --- |
+| **App Store** | Home Assistant, Philips Hue, Apple Home | `ios/project.yml` · `EDITION=appstore` |
+| **Smart Life** | all of the above plus Smart Life / Tuya, for TestFlight and your own phone | `ios/project-smartlife.yml` (the scripts' default) |
 
-1. On the Mac: right-click the menu bar icon → **Pair iPhone…**. A QR code appears.
+Smart Life is reached through the sign-in Home Assistant's Tuya integration uses, not through an API Tuya offers to
+apps, so it stays out of the App Store edition entirely: its code lives in its own module (`core/Sources/HouseSmartLife`)
+that only the Smart Life edition and the Mac app link, and `build-ios.sh` refuses an App Store archive that contains it.
+The two editions are separate apps (bundle id and App Group), so both can sit on one phone.
+
+### iPhone Duo
+
+Closed, the Duo runs the app like any iPhone. Open it and the app spreads across the inner display, one half each,
+so the 3D model and the controls are never on top of each other:
+
+- **Open flat, held sideways:** the home in 3D on the left half, scenes, rooms and devices on the right. A lamp or
+  AC opens its controls on the right half while the model turns to it on the left.
+- **Half-folded like a book:** the same, broken exactly at the fold. Nothing sits across the crease.
+- **Half-folded like a laptop on a table:** the model stands on the upper half, facing you, and the controls lie on
+  the lower half, under your thumb — a small home hub for the desk or the bedside.
+- **Open flat, held upright:** the model above the crease, the controls below it, tiles three to a row.
+- **Opening the phone** plays the camera sweep and the lights coming on, as when the app starts.
+- **The floor plan editor** keeps the plan on the left half and the details of what you picked on the right,
+  instead of in a sheet over the plan. Settings and the connection screens stay at a readable width.
+- **Beside another app** the app can be resized, so it takes the shape it is given; narrower than 720 points, it
+  stacks as on any iPhone.
+
+To try it, run the app on the iPhone Duo simulator (Xcode 27.1 or newer) and fold it with the **Closed**,
+**Partially Open** and **Open** buttons under the device in Device Hub:
+
+```bash
+DEVICE="iPhone Duo" ./scripts/ios-sim.sh
+```
+
+In a browser, `?platform=ios&fold=455,0,41,669` at 951×669 stands in for a Duo half-folded like a book, and
+`fold=0,455,669,41` at 669×951 for one standing like a laptop.
+
+The fold comes from the system's division region (`reservedRegions(kind: .division)`). The iPhone Duo simulator in
+Xcode 27.1 reports none, so where there is none at all and the hinge says half open, the app takes the fold to run
+down the middle of the screen ([FoldWebView.swift](ios/Sources/FoldWebView.swift)).
+
+### Sync with a Mac or PC
+
+Optional. Pair a Mac or a Windows PC and your floor plan — rooms, furniture, lamps, scenes and the links to real
+devices — plus the Home Assistant and Hue connections stay the same on both, whichever one you set up or edit first.
+[House Control for Windows](https://github.com/0xProbabillity/house-control-windows) pairs exactly like the Mac app.
+
+1. On the computer: right-click the House Control icon — in the menu bar on a Mac, in the taskbar's tray on a PC —
+   → **Pair Phone…** (**Pair iPhone…** in older versions). A QR code appears.
    macOS asks once whether House Control may find devices on your local network: allow it.
-2. On the iPhone: **Settings** (the sliders button) → **Pair with Mac**, and point the camera at the code.
-   Or press **Copy Pairing Link** on the Mac and paste it on the phone.
+2. On the iPhone: **Settings** (the sliders button) → **Pair with Mac or PC**, and point the camera at the code.
+   Or press **Copy Pairing Link** on the computer and paste it on the phone.
 
-From then on, whenever both are on the same Wi-Fi and the app is open, the phone has what the Mac has:
-**Save & apply** in the editor updates the phone a moment later.
+[House Control for Android](https://github.com/0xProbabillity/house-control-android) pairs with the same code.
 
-Nothing goes through a server. The Mac advertises itself with Bonjour and the two talk over TLS with a
+From then on, whenever both are on the same Wi-Fi and the app is open, a plan saved on one reaches the other a
+moment later. A home set up on the phone first goes to the computer when you pair them. If both changed the plan
+while apart, the phone asks which one to keep. A Home Assistant or Hue Bridge connected, or disconnected, on either side
+is the newest one on both.
+
+Nothing goes through a server. The computer advertises itself with Bonjour (DNS-SD) and the two talk over TLS with a
 pre-shared key that only the QR code carries, so a device that never saw the code cannot connect.
 **Reset Pairing…** in the pairing window issues a new key.
 
 ### Real devices on the iPhone
 
-The phone signs in to Smart Life on its own: **Settings → Connect Smart Life**. The User Code is filled in from the
+In the Smart Life edition the phone signs in to Smart Life on its own: **Settings → Connect Smart Life**. The User Code is filled in from the
 Mac if you are signed in there. The sign-in code has to be scanned by the Smart Life app, which is on the very phone
-you are holding — so the paired Mac puts the code on its screen for you. Without a Mac, share the code to any other screen.
+you are holding. So **Save code to Photos**, then in Smart Life tap **+ → Scan** and open the picture from its photo
+button. A paired Mac also puts the code on its screen for you, and **Share code** sends it to any other screen.
 
 The session is kept in the iPhone's Keychain and never leaves the device.
+
+## Widgets
+
+<p align="center">
+  <img src="docs/widgets.png" width="820" alt="House Control widgets: Home in 3D, scenes, climate, a light and a room">
+</p>
+
+Every widget is live: tap a lamp, a scene or an AC and it switches without opening the app.
+
+- **Home** — your home as a small 3D model, every lamp glowing in its own colour; scenes, the climate strip and
+  tappable lamps in the bigger sizes (extra large on the Mac).
+- **Scenes**, **Light** (one lamp you pick), **Room** (its lamps; the large size shows the room alone in 3D) and
+  **Climate** (an AC's dial with the room temperature, power and − / +).
+- **Lock Screen:** Home Status, Light and Climate as circles, rectangles and an inline line.
+- **Controls** for Control Center, the Lock Screen and the Action button (iOS 18, macOS 26): All Lights, a Light,
+  a Scene, an Air Conditioner, and on the iPhone **House Control**, which opens the app.
+- **Quick actions:** press and hold the app icon on the iPhone. Choose which scenes, lamps and ACs it offers in
+  **Settings → Quick Actions**.
+
+On the Mac they need the app running in the menu bar (it carries out what you tap); on the iPhone the widget talks
+to Home Assistant, Hue and Smart Life itself, and Apple Home devices switch when the app next opens. How it fits
+together, and how to build and try it: [docs/widgets.md](docs/widgets.md).
 
 ## Make it your home
 
@@ -225,10 +324,22 @@ Right-click the icon and choose **Edit Home…**
   <img src="docs/editor.png" width="820" alt="The floor plan editor">
 </p>
 
-- Drag rooms to move them and drag a corner to resize; everything snaps to 5 cm.
+- Drag rooms to move them; drag the dots on a selected room's corners and sides to resize it. Edges snap to
+  the rooms around them (hold ⌥ not to), everything else to 5 cm.
 - Where two rooms touch, the wall between them appears by itself. Walls facing the camera are cut away.
-- Add doors, windows, furniture, lamps and air conditioners from the list on the left.
+  **Split in two** divides a room and puts a door between the halves.
+- Add rooms, lamps, air conditioners, doors, windows, stairs and furniture from the bar under the plan.
+  Doors and windows slide along the walls and jump to the nearest one; drag their ends to make them wider.
+- Scroll to move around, pinch or ⌘-scroll to zoom. ⌘D duplicates, R turns, ⌘Z undoes.
 - **Save & apply** writes the plan and reloads the panel.
+
+### Floors
+
+A house on more than one floor: **+ Floor** over the plan adds one. A new floor can copy the rooms of the one
+below it, or start as one room as big as it to divide up; the floor below shows faintly underneath, with its
+stairs, so walls line up. Each floor has its own name and ceiling height. In the panel, buttons under the 3D model
+switch floors, and picking a room or a lamp goes to its floor by itself. The **House** demo is on two floors.
+A home on one floor looks and works exactly as before.
 
 The plan is a single JSON file, `~/Library/Application Support/HouseControl/plan.json`. You can write it by hand,
 export it, or import someone else's: see [docs/floor-plan.md](docs/floor-plan.md) for every field.
@@ -283,13 +394,14 @@ None of these are part of this repository, and the build does not embed them in 
 **Sign out** in the editor deletes `smartlife.json`. Deleting the folder resets the app to the demo plan.
 
 On the iPhone the floor plan lives in the app's own folder, and the Smart Life session, the pairing key and the
-Home Assistant and Hue connections the Mac shared in the Keychain.
+Home Assistant and Hue connections the Mac shared live in the Keychain.
 
 ## Development
 
 ```
 web/      the UI: Three.js scene, panel, island, editor, AI Access window and the AI tools (Vite, plain ES modules)
-core/     what both apps share: Smart Life and Tuya clients, plan store, Mac ⇄ iPhone sync, the AI gateway (SwiftPM, with tests)
+core/     what both apps share: plan store, device platforms, Mac ⇄ iPhone sync, the AI gateway, and the Smart Life
+          and Tuya clients as a separate module (SwiftPM, with tests)
 macos/    the Mac shell: menu bar item, panel, island and editor windows (SwiftPM)
 ios/      the iPhone shell: SwiftUI, generated into an Xcode project by XcodeGen
 scripts/  build-app.sh, build-ios.sh and ios-sim.sh build the apps, release-mac.sh makes the .dmg,
@@ -330,7 +442,7 @@ Environment variables understood by the app:
 | `HOUSE_DOCK=1` | Show a Dock icon, so UI automation tools can see the app |
 | `HOUSE_ISLAND=0` | Run without the island (`1` forces it on) |
 | `HOUSE_ISLAND_EXPANDED=1` | Keep the island open |
-| `HOUSE_OPEN_PAIRING=1` | Open the Pair iPhone window at launch |
+| `HOUSE_OPEN_PAIRING=1` | Open the Pair Phone window at launch |
 | `HOUSE_COMPUTER_NAME="Studio Mac"` | The name paired iPhones see, instead of the Mac's own (screenshots) |
 | `HOUSE_SNAPSHOT_DIR=/some/folder` | Write `panel.png` and `island.png` there a few seconds after launch |
 | `HOUSE_RENDER_HIDDEN=1` | Keep drawing while the screen is locked, for unattended captures |
@@ -339,7 +451,8 @@ Environment variables understood by the app:
 | `HOUSE_AGENT_LINK_FILE=/some/file` | Write the live AI Access link there, for scripted tests |
 | `HOUSE_EVAL_DIR=/some/folder` | Scripted UI checks: a `panel.js` / `editor.js` / `island.js` dropped there runs in that page (as an async function body) and its result is written to `<mode>.json` |
 
-The iPhone app understands `HOUSE_DATA_DIR`, `HOUSE_OPEN_DEVICE` and `HOUSE_SCREEN=home|settings|connections|pairing|smartlife|welcome`;
+The iPhone app understands `HOUSE_DATA_DIR`, `HOUSE_OPEN_DEVICE`, `HOUSE_SYNC_ENDPOINT=host:port` (a Mac test instance
+without Bonjour) and `HOUSE_SCREEN=home|settings|connections|pairing|smartlife|homeassistant|hue|devices|newhome|editor|welcome`;
 `scripts/ios-sim.sh` passes any `HOUSE_*` variable on to the simulator.
 
 For example, a throw-away instance on the demo plan, pinned open:
@@ -359,10 +472,11 @@ The binary has a few offline self-checks and one read-only diagnostic:
 
 ### Releasing the Mac app
 
-Set `MARKETING_VERSION` in `ios/Config/Base.xcconfig`, commit, then tag and push:
+Set `MARKETING_VERSION` in `ios/Config/Base.xcconfig`, add a `## <version> — <date>` section to
+[CHANGELOG.md](CHANGELOG.md) (it becomes the release notes), commit, then tag and push:
 
 ```bash
-git tag v0.1.0 && git push origin v0.1.0
+git tag v1.0.0 && git push origin v1.0.0
 ```
 
 [`release.yml`](.github/workflows/release.yml) builds the universal app on a GitHub macOS runner
@@ -375,8 +489,8 @@ signed and notarized image locally instead; the script lists what it needs.
 
 ## Limitations
 
-- The iPhone app is not on the App Store (it is on TestFlight for the author's testers).
-- The floor plan is edited on the Mac only. The iPhone receives it, and only while both are on the same network.
+- The iPhone app is not on the App Store yet (it is on TestFlight for the author's testers).
+- The Mac and the iPhone sync only while both are on the same network; there is no cloud in between.
 - Rooms are axis-aligned rectangles. An L-shaped room is two rooms.
 - Apple Home devices are switched by the iPhone app only: macOS gives HomeKit to App Store apps only.
 - Smart Life devices are reached through Tuya's cloud, not over the local network, so they need an internet

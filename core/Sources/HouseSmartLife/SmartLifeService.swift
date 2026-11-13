@@ -1,7 +1,6 @@
 import Foundation
 import CryptoKit
-import CoreImage
-import ImageIO
+import HouseCore
 
 /// What the app needs from a device backend, whichever way the account is connected.
 @MainActor
@@ -187,6 +186,14 @@ final class SmartLifeService: DeviceCloud {
         _ = try await request("POST", "/v1.1/m/thing/\(deviceId)/commands", body: ["commands": commands])
     }
 
+    /// DIY IR keys are not standard device data points. Smart Life Tap-to-Run
+    /// wraps the learned key and is exposed by the same device-sharing session.
+    func triggerScene(homeId: String, sceneId: String) async throws {
+        let result = try await request("POST", "/v1.0/m/scene/ha/trigger",
+                                       body: ["homeId": homeId, "sceneId": sceneId])
+        guard result as? Bool == true else { throw Failure(message: "Smart Life did not run the linked IR command") }
+    }
+
     /// Read-only snapshot for diagnostics: raw status and specification of the given devices.
     func diagnostics(for ids: [String]) async -> [String: Any] {
         var out: [String: Any] = [:]
@@ -351,24 +358,5 @@ final class SmartLifeService: DeviceCloud {
             let plain = try AES.GCM.open(box, using: SymmetricKey(data: Data(secret.utf8)))
             return String(data: plain, encoding: .utf8) ?? ""
         }
-    }
-}
-
-/// QR codes for the Smart Life login and for pairing an iPhone with the Mac.
-public enum QRCode {
-    public static func image(for text: String, scale: CGFloat = 10) -> CGImage? {
-        guard let filter = CIFilter(name: "CIQRCodeGenerator") else { return nil }
-        filter.setValue(Data(text.utf8), forKey: "inputMessage")
-        filter.setValue("M", forKey: "inputCorrectionLevel")
-        guard let output = filter.outputImage?.transformed(by: CGAffineTransform(scaleX: scale, y: scale)) else { return nil }
-        return CIContext().createCGImage(output, from: output.extent)
-    }
-
-    public static func png(for text: String, scale: CGFloat = 10) -> Data? {
-        guard let image = image(for: text, scale: scale) else { return nil }
-        let data = NSMutableData()
-        guard let dest = CGImageDestinationCreateWithData(data, "public.png" as CFString, 1, nil) else { return nil }
-        CGImageDestinationAddImage(dest, image, nil)
-        return CGImageDestinationFinalize(dest) ? data as Data : nil
     }
 }
